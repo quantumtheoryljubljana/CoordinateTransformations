@@ -8,7 +8,9 @@
  * v' = Q^T (v-V) - omega J r'
  * a' = Q^T (a-A) - 2 omega J v' + omega^2 r' - alpha J r'
  *
- * Vsi členi pospeška imajo enako merilo. Dolžin puščic ne normaliziramo.
+ * Hitrosti, a, a′ in vsi členi razcepa imajo en skupen faktor povečave.
+ * Izberemo ga ob spremembi začetnih nastavitev; mogoč je tudi ročni izbor.
+ * Med animacijo ostane stalen; fizikalen izračun je neodvisen od povečave.
  * Čas ni omejen. Preteklo trajektorijo ohranimo od t = 0; pomično okno
  * uporabljamo le za napoved gibanja. Merilo zajame tudi celotno preteklo pot.
  */
@@ -17,12 +19,13 @@
   const $ = id => document.getElementById(id);
   const TAU = 2 * Math.PI, DEG = Math.PI / 180;
   const C = {
-    alice:'#c2444c', bob:'#2455d6', R:'#138367', v:'#ad610c', a:'#8551b0',
+    alice:'#c2444c', bob:'#2455d6', R:'#138367', v:'#ad610c', a:'#8551b0', aPrime:'#d12e3f',
     inertial:'#8551b0', translation:'#be4f45', coriolis:'#1e80a0',
     centrifugal:'#a77600', euler:'#238360', text:'#17212e', muted:'#677586',
     grid:'#edf1f6', axis:'#a8b3c2', particle:'#26374c', white:'#ffffff'
   };
-  const SCALES = Object.freeze({v:0.6, a:0.35});
+  // Enako risalno merilo pri povečavi ×1 za komponente v in a.
+  const SCALES = Object.freeze({v:1, a:1});
   // Debelina črte in širina konice sta v zaslonskih pikah, ne v metrih.
   // Spreminja se samo dolžina vektorja; pri kratki puščici se konica skrajša.
   const VECTOR_STYLE = Object.freeze({shaftWidth:2.8,headLength:10,headWidth:8});
@@ -45,16 +48,19 @@
       motionOscX:'Nihanje vzdolž osi x',motionOscY:'Nihanje vzdolž osi y',
       translationOffset:'Stalen premik izhodišča',translationVelocity:'Konstantna hitrost',translationAcceleration:'Konstanten pospešek',
       rotationAngle:'Stalen kot',rotationVelocity:'Konstantna kotna hitrost',rotationAcceleration:'Konstanten kotni pospešek',
-      directionNote:'Pozitiven kot pomeni zasuk v nasprotni smeri urnega kazalca. Za vzporedne osi izberite stalen kot θ₀ = 0°.',
+      directionNote:'Pozitiven kot pomeni zasuk v nasprotni smeri urnega kazalca. Za vzporedne osi izberite stalen kot φ₀ = 0°.',
       showPosition:'Krajevna vektorja r, r′',showVelocity:'Hitrosti v, v′',showAcceleration:'Pospeška a, a′',
       showComponents:'Razcep pospeška pri Bobu',showPaths:'Poti gibanja',showAxes:'Koordinatna mreža',sameScale:'Isto merilo vseh prikazov',
       centerX:'Središče x<sub>c</sub>',centerY:'Središče y<sub>c</sub>',initialX:'Začetna lega x₀',initialY:'Začetna lega y₀',
       radius:'Polmer kroga ρ',amplitude:'Amplituda nihanja L',angularRateA:'Kotna hitrost Ω',angularFrequency:'Krožna frekvenca Ω',
       initialVx:'Začetna hitrost V₀ₓ',initialVy:'Začetna hitrost V₀ᵧ',velocityX:'Hitrost Vₓ',velocityY:'Hitrost Vᵧ',
       initialOmega:'Začetna kotna hitrost ω₀',omega:'Kotna hitrost ω',
-      parameters:{aVx:'Hitrost vₓ',aVy:'Hitrost vᵧ',rX:'Začetni premik R₀ₓ',rY:'Začetni premik R₀ᵧ',bAx:'Pospešek Aₓ',bAy:'Pospešek Aᵧ',theta0:'Začetni kot θ₀',alpha:'Kotni pospešek α'},
-      gridSpacing:'Razmik mreže',body:'telo',translationTerm:'translacija',totalTerm:'skupen',
-      componentsHint:'Pri Bobu je skupni pospešek prikazan s črtkano puščico.',
+      parameters:{aVx:'Hitrost vₓ',aVy:'Hitrost vᵧ',rX:'Začetni premik R₀ₓ',rY:'Začetni premik R₀ᵧ',bAx:'Pospešek Aₓ',bAy:'Pospešek Aᵧ',theta0:'Začetni kot φ₀',alpha:'Kotni pospešek α'},
+      gridSpacing:'Razmik mreže',body:'telo',translationTerm:'translacija',
+      componentsHint:'Vsi členi pospeška imajo isto povečavo. Rdeči a′ je rezultanta.',
+      vectorMagnification:'Povečava vektorjev',vectorScaleNote:'Hitrosti in pospeški ×{factor}',
+      autoMagnification:'Prilagodi nastavitvam',
+      autoMagnificationHint:'Izberi skupno povečavo iz začetnih nastavitev in prve sekunde gibanja. Med animacijo ostane stalna.',
       invalidRange:'Vnesite število med {min} in {max}.',invalidTime:'Vnesite končen nenegativen čas v sekundah.',
       runningStatus:'Animacija teče.',pausedStatus:'Animacija je ustavljena.',resetStatus:'Čas je ponastavljen na nič.',
       motionChanged:'Vrsta gibanja je spremenjena. Čas ostane {time} s.',exampleSelected:'Izbran primer: {name}.',
@@ -78,16 +84,19 @@
       motionOscX:'Oscillation along the x axis',motionOscY:'Oscillation along the y axis',
       translationOffset:'Fixed origin offset',translationVelocity:'Constant velocity',translationAcceleration:'Constant acceleration',
       rotationAngle:'Fixed angle',rotationVelocity:'Constant angular velocity',rotationAcceleration:'Constant angular acceleration',
-      directionNote:'Positive angles are counterclockwise. For parallel axes, select a fixed angle θ₀ = 0°.',
+      directionNote:'Positive angles are counterclockwise. For parallel axes, select a fixed angle φ₀ = 0°.',
       showPosition:'Position vectors r, r′',showVelocity:'Velocities v, v′',showAcceleration:'Accelerations a, a′',
       showComponents:'Acceleration components for Bob',showPaths:'Motion paths',showAxes:'Coordinate grid',sameScale:'Same scale in all views',
       centerX:'Center x<sub>c</sub>',centerY:'Center y<sub>c</sub>',initialX:'Initial position x₀',initialY:'Initial position y₀',
       radius:'Circle radius ρ',amplitude:'Oscillation amplitude L',angularRateA:'Angular velocity Ω',angularFrequency:'Angular frequency Ω',
       initialVx:'Initial velocity V₀ₓ',initialVy:'Initial velocity V₀ᵧ',velocityX:'Velocity Vₓ',velocityY:'Velocity Vᵧ',
       initialOmega:'Initial angular velocity ω₀',omega:'Angular velocity ω',
-      parameters:{aVx:'Velocity vₓ',aVy:'Velocity vᵧ',rX:'Initial offset R₀ₓ',rY:'Initial offset R₀ᵧ',bAx:'Acceleration Aₓ',bAy:'Acceleration Aᵧ',theta0:'Initial angle θ₀',alpha:'Angular acceleration α'},
-      gridSpacing:'Grid spacing',body:'body',translationTerm:'translation',totalTerm:'total',
-      componentsHint:'In Bob’s view, the total acceleration is shown as a dashed arrow.',
+      parameters:{aVx:'Velocity vₓ',aVy:'Velocity vᵧ',rX:'Initial offset R₀ₓ',rY:'Initial offset R₀ᵧ',bAx:'Acceleration Aₓ',bAy:'Acceleration Aᵧ',theta0:'Initial angle φ₀',alpha:'Angular acceleration α'},
+      gridSpacing:'Grid spacing',body:'body',translationTerm:'translation',
+      componentsHint:'All acceleration components share one magnification. Red a′ is the resultant.',
+      vectorMagnification:'Vector magnification',vectorScaleNote:'Velocities and accelerations ×{factor}',
+      autoMagnification:'Fit to settings',
+      autoMagnificationHint:'Choose a shared magnification from the initial settings and first second of motion. It stays fixed during animation.',
       invalidRange:'Enter a number between {min} and {max}.',invalidTime:'Enter a finite, nonnegative time in seconds.',
       runningStatus:'Animation running.',pausedStatus:'Animation paused.',resetStatus:'Time has been reset to zero.',
       motionChanged:'Motion type changed. Time remains {time} s.',exampleSelected:'Selected example: {name}.',
@@ -104,8 +113,9 @@
   });
   const DEFAULT_DISPLAY = Object.freeze({
     showPosition:false, showVelocity:true, showAcceleration:true,
-    showComponents:false, showPaths:true, showAxes:true, sameScale:false
+    showComponents:true, showPaths:true, showAxes:true, sameScale:false
   });
+  let magnification=1,magnificationAutomatic=true,magnificationPending=true;
   const params = {...DEFAULTS}, display = {...DEFAULT_DISPLAY};
   let time=0, windowStart=0, running=false, raf=null, lastFrame=null, cache=null;
   let lastReadout=-Infinity, lastViews=null, bobTrail=null;
@@ -173,7 +183,7 @@
       translation:mul(rotate(A,-theta),-1),
       coriolis:mul(J(v),-2*omega),
       centrifugal:mul(r,omega*omega),
-      euler:mul(J(r),-alpha)
+      euler:[alpha*r[1],-alpha*r[0]] // -alpha z-hat × r′: pravokotno na r′.
     };
     const a=Object.values(terms).reduce(add,[0,0]);
     return {t,alice,frame,bob:{r,v,a,terms}};
@@ -189,7 +199,10 @@
     getTimeWindow:()=>({start:windowStart,end:windowStart+windowSpan(),span:windowSpan(),sampleCount:cache?cache.points.length:0}),
     getTrail:()=>bobTrail?{start:0,end:bobTrail.end,pointCount:bobTrail.count,bobBounds:{...bobTrail.bounds}}:null,
     isRunning:()=>running,
-    getViews:()=>lastViews?JSON.parse(JSON.stringify(lastViews)):null
+    getViews:()=>lastViews?JSON.parse(JSON.stringify(lastViews)):null,
+    getAccelerationView:()=>null,
+    getMagnification:()=>({v:magnification,a:magnification}),
+    getMagnificationMode:()=>magnificationAutomatic?'automatic':'manual'
   });
 
   const definitions=[
@@ -205,7 +218,7 @@
     {key:'bVy',group:'translation',label:'Začetna hitrost V₀ᵧ',min:-2,max:2,step:0.05,unit:'m/s'},
     {key:'bAx',group:'translation',label:'Pospešek Aₓ',min:-1,max:1,step:0.02,unit:'m/s²'},
     {key:'bAy',group:'translation',label:'Pospešek Aᵧ',min:-1,max:1,step:0.02,unit:'m/s²'},
-    {key:'theta0',group:'rotation',label:'Začetni kot θ₀',min:-180,max:180,step:1,unit:'°'},
+    {key:'theta0',group:'rotation',label:'Začetni kot φ₀',min:-180,max:180,step:1,unit:'°'},
     {key:'omega0',group:'rotation',label:'Začetna kotna hitrost ω₀',min:-2,max:2,step:0.05,unit:'rad/s'},
     {key:'alpha',group:'rotation',label:'Kotni pospešek α',min:-0.4,max:0.4,step:0.01,unit:'rad/s²'}
   ];
@@ -227,7 +240,7 @@
           pause(); event.target.setAttribute('aria-invalid','true');
           setStatus(tr('invalidRange',{min:fmt(d.min),max:fmt(d.max)})); return;
         }
-        pause();params[d.key]=n;invalidate();
+        pause();params[d.key]=n;invalidate();requestAutoMagnification();
         syncInputs(event.target.id);updateLabels();render();
         clearExample();
       });
@@ -283,6 +296,11 @@
     }
     $('showAcceleration').disabled=display.showComponents;
     $('showAcceleration').title=display.showComponents?tr('componentsHint'):'';
+    syncMagnificationInputs();
+    const vectorsEnabled=display.showVelocity||display.showAcceleration||display.showComponents;
+    for(const suffix of ['Range','Number']) $('vectorMagnification'+suffix).disabled=!vectorsEnabled;
+    $('autoMagnification').disabled=!vectorsEnabled;
+    $('autoMagnification').title=tr('autoMagnificationHint');
     updatePlay();
   }
   function updatePlay() {
@@ -332,7 +350,7 @@
   };
   for(const id of ['aliceMode','translationMode','rotationMode']) {
     $(id).addEventListener('change',()=>{
-      pause();params[id]=$(id).value;invalidate();clearExample();updateLabels();render();
+      pause();params[id]=$(id).value;invalidate();requestAutoMagnification();clearExample();updateLabels();render();
       setStatus(tr('motionChanged',{time:fmt(time)}));
     });
   }
@@ -342,7 +360,7 @@
       pause();
       Object.assign(params,DEFAULTS,{rX:0,rY:0,bVx:0,bVy:0,bAx:0,bAy:0,theta0:0,omega0:0,alpha:0},examples[button.dataset.example]);
       clearExample();button.classList.add('active');button.setAttribute('aria-pressed','true');
-      time=0;windowStart=0;invalidate();syncInputs();updateLabels();render();updatePlay();
+      time=0;windowStart=0;invalidate();requestAutoMagnification();syncInputs();updateLabels();render();updatePlay();
       setStatus(tr('exampleSelected',{name:button.textContent}));
     });
   });
@@ -351,6 +369,7 @@
   $('step').addEventListener('click',()=>seek(Math.round((time+0.05)*1e8)/1e8));
   $('restoreDefaults').addEventListener('click',()=>{
     pause();Object.assign(params,DEFAULTS);Object.assign(display,DEFAULT_DISPLAY);
+    requestAutoMagnification();
     $('playbackSpeed').value='1';time=0;windowStart=0;
     clearExample();invalidate();syncInputs();updateLabels();render();updatePlay();
     setStatus(tr('defaultsRestored'));
@@ -368,6 +387,32 @@
     }
   });
   $('playbackSpeed').addEventListener('change',()=>{lastFrame=null;});
+  const factorText=value=>value.toLocaleString(language==='sl'?'sl-SI':'en-US',{maximumFractionDigits:2,useGrouping:false});
+  function requestAutoMagnification() {
+    magnificationAutomatic=true;magnificationPending=true;
+  }
+  function syncMagnificationInputs(skip='') {
+    const range=$('vectorMagnificationRange'),number=$('vectorMagnificationNumber');
+    if(range.id!==skip)range.value=Math.log10(magnification);
+    if(number.id!==skip)number.value=magnification;
+    range.setAttribute('aria-valuetext','×'+factorText(magnification));
+    number.removeAttribute('aria-invalid');
+    $('autoMagnification').classList.toggle('active',magnificationAutomatic);
+    $('autoMagnification').setAttribute('aria-pressed',String(magnificationAutomatic));
+  }
+  for(const suffix of ['Range','Number']) {
+      const input=$('vectorMagnification'+suffix);
+      input.addEventListener('input',()=>{
+        const raw=input.valueAsNumber,value=suffix==='Range'?Math.round(10**raw*100)/100:raw;
+        if(!Number.isFinite(value)||value<0.1||value>1000) {
+          input.setAttribute('aria-invalid','true');setStatus(tr('invalidRange',{min:factorText(0.1),max:1000}));return;
+        }
+        magnification=value;magnificationAutomatic=false;magnificationPending=false;
+        syncMagnificationInputs(input.id);render();
+      });
+      input.addEventListener('change',()=>syncMagnificationInputs());
+  }
+  $('autoMagnification').addEventListener('click',()=>{requestAutoMagnification();render();});
   document.querySelectorAll('[data-language]').forEach(button=>button.addEventListener('click',()=>{
     const next=button.dataset.language;
     if(next===language||!translations[next])return;
@@ -386,16 +431,17 @@
   });
 
   const termNames=[
-    {key:'inertial',name:'a_Alice',color:C.inertial},
+    {key:'inertial',name:'a',color:C.a},
     {key:'translation',name:'a_translacija',color:C.translation},
     {key:'coriolis',name:'a_coriolis',color:C.coriolis},
     {key:'centrifugal',name:'a_centrifugal',color:C.centrifugal},
     {key:'euler',name:'a_Euler',color:C.euler}
   ];
-  function descriptors(s,kind) {
+  function descriptors(s,kind,zoomOverride=magnification) {
     const arrows=[];
-    const push=(from,vector,factor,color,name,dash=false)=>{
-      arrows.push({from,to:add(from,mul(vector,factor)),vector,factor,color,name,dash});
+    const push=(from,vector,baseFactor,color,name,quantity='position')=>{
+      const zoom=quantity==='position'?1:zoomOverride,factor=baseFactor*zoom;
+      arrows.push({from,to:add(from,mul(vector,factor)),vector,factor,baseFactor,magnification:zoom,quantity,color,name,dash:false});
     };
     if(kind==='frames') {
       push([0,0],s.frame.R,1,C.R,'R');
@@ -403,20 +449,26 @@
       push(s.frame.R,sub(s.alice.r,s.frame.R),1,C.bob,'r′');
     } else {
       const body=s[kind],prime=kind==='bob'?'′':'';
+      if(display.showPosition&&(kind!=='bob'||norm(body.r)>1e-11)) push([0,0],body.r,1,kind==='alice'?C.alice:C.bob,'r'+prime);
+      if(display.showVelocity&&(kind!=='bob'||norm(body.v)>1e-11)) push(body.r,body.v,SCALES.v,C.v,'v'+prime,'v');
       if(kind==='bob'&&display.showComponents) {
-        let corner=[...body.r];
+        // Vsak člen je pripet na trenutno lego telesa. Centrifugalni člen
+        // +omega^2 r′ zato jasno kaže stran od Bobovega izhodišča.
         for(const term of termNames) {
           const vector=body.terms[term.key];
           if(norm(vector)>1e-11) {
-            push(corner,vector,SCALES.a,term.color,term.key==='translation'?'a_'+tr('translationTerm'):term.name);
-            corner=add(corner,mul(vector,SCALES.a));
+            push(body.r,vector,SCALES.a,term.color,term.key==='translation'?'a_'+tr('translationTerm'):term.name,'a');
           }
         }
-        push(body.r,body.a,SCALES.a,C.a,'a_'+tr('totalTerm'),true);
+        if(norm(body.a)>1e-11)push(body.r,body.a,SCALES.a,C.aPrime,'a′','a');
       } else {
-        if(display.showPosition) push([0,0],body.r,1,kind==='alice'?C.alice:C.bob,'r'+prime);
-        if(display.showVelocity) push(body.r,body.v,SCALES.v,C.v,'v'+prime);
-        if(display.showAcceleration) push(body.r,body.a,SCALES.a,C.a,'a'+prime);
+        if(display.showAcceleration) {
+          // a je Alicin pospešek, izražen vzdolž Bobovih osi; a′ je Bobov.
+          if(kind==='bob') {
+            if(norm(body.terms.inertial)>1e-11)push(body.r,body.terms.inertial,SCALES.a,C.a,'a','a');
+            if(norm(body.a)>1e-11)push(body.r,body.a,SCALES.a,C.aPrime,'a′','a');
+          } else push(body.r,body.a,SCALES.a,C.a,'a','a');
+        }
       }
     }
     return arrows;
@@ -426,12 +478,12 @@
     b.x0=Math.min(b.x0,p[0]);b.x1=Math.max(b.x1,p[0]);
     b.y0=Math.min(b.y0,p[1]);b.y1=Math.max(b.y1,p[1]);
   }
-  function collectBounds(bounds,s) {
+  function collectBounds(bounds,s,includeVectors=true) {
     for(const kind of ['alice','bob','frames']) {
       const b=bounds[kind];
       extend(b,kind==='frames'?s.alice.r:s[kind].r);
       if(kind==='frames') extend(b,s.frame.R);
-      for(const arrow of descriptors(s,kind)){extend(b,arrow.from);extend(b,arrow.to);}
+      if(includeVectors)for(const arrow of descriptors(s,kind)){extend(b,arrow.from);extend(b,arrow.to);}
     }
   }
   function mergeBounds(target,source) {
@@ -499,7 +551,8 @@
     const count=Math.min(2600,Math.max(400,Math.ceil(span*rate*25)));
     const points=[],bounds={alice:boundsNew(),bob:boundsNew(),frames:boundsNew()};
     for(let i=0;i<=count;i++) {
-      const s=stateAt(start+span*i/count);points.push(s);collectBounds(bounds,s);
+      // Napoved zajame lege, ne konic še nenarisanih prihodnjih vektorjev.
+      const s=stateAt(start+span*i/count);points.push(s);collectBounds(bounds,s,false);
     }
     // Polni krog je viden tudi pri časovnem intervalu, krajšem od periode.
     if(params.aliceMode==='circle'&&display.showPaths) {
@@ -520,12 +573,42 @@
     ctx.clearRect(0,0,w,h);ctx.lineCap='round';ctx.lineJoin='round';
     return {ctx,w,h};
   }
-  function makeView(b,w,h,kind) {
+  function makeView(b,w,h,kind,plotTop=0) {
     // Rob mora v tretjem prikazu sprejeti tudi Bobovi orientacijski osi.
     const margin=kind==='frames'?75:46;
     const dx=Math.max(2.8,(b.x1-b.x0)*1.06),dy=Math.max(2.8,(b.y1-b.y0)*1.06);
-    const scale=Math.min((w-2*margin)/dx,(h-2*margin)/dy);
-    return {w,h,scale,cx:(b.x0+b.x1)/2,cy:(b.y0+b.y1)/2,kind};
+    const scale=Math.min((w-2*margin)/dx,(h-plotTop-2*margin)/dy);
+    return {w,h,scale,cx:(b.x0+b.x1)/2,cy:(b.y0+b.y1)/2,kind,plotTop};
+  }
+  function configurationMagnification(prepared) {
+    // Uporabimo začetno konfiguracijo, ne trenutnega časa animacije.
+    const kinds=['alice','bob','frames'],bounds=Object.fromEntries(kinds.map(k=>[k,boundsNew()]));
+    for(let i=0;i<=240;i++)collectBounds(bounds,stateAt(windowSpan()*i/240),false);
+    if(params.aliceMode==='circle'&&display.showPaths) {
+      for(const kind of ['alice','frames']) {
+        extend(bounds[kind],[params.aX-params.radius,params.aY-params.radius]);
+        extend(bounds[kind],[params.aX+params.radius,params.aY+params.radius]);
+      }
+    }
+    const views=Object.fromEntries(kinds.map(kind=>[kind,makeView(bounds[kind],prepared[kind].w,prepared[kind].h,kind)]));
+    if(display.sameScale) {
+      const scale=Math.min(...Object.values(views).map(v=>v.scale));
+      for(const view of Object.values(views))view.scale=scale;
+    }
+    let largest=0;
+    // Kratek pogled naprej zajame tudi hitrosti, ki so ob t=0 ničelne.
+    // Upoštevamo vse člene, da prikaz/skrivanje puščic ne spreminja povečave.
+    for(let i=0;i<=8;i++) {
+      const s=stateAt(i/8);
+      for(const kind of ['alice','bob']) {
+        const vectors=kind==='alice'?[s.alice.v,s.alice.a]:[s.bob.v,s.bob.a,...Object.values(s.bob.terms)];
+        for(const vector of vectors)largest=Math.max(largest,norm(vector)*views[kind].scale);
+      }
+    }
+    if(largest<1e-10)return 1;
+    const size=Math.min(...['alice','bob'].flatMap(k=>[prepared[k].w,prepared[k].h]));
+    const target=clamp(size*0.2,40,78);
+    return Math.round(clamp(target/largest,0.1,1000)*100)/100;
   }
   const screen=(p,v)=>[v.w/2+(p[0]-v.cx)*v.scale,v.h/2-(p[1]-v.cy)*v.scale];
   function line(ctx,points,color,width=1.5,dash=[]) {
@@ -553,15 +636,15 @@
     return fmt(n,Math.abs(n)>=1?1:2).replace(/[.,]0$/,'');
   }
   function grid(ctx,v) {
-    const {w,h}=v,origin=screen([0,0],v);
+    const {w,h,plotTop}=v,origin=screen([0,0],v);
     const x0=v.cx-(w/2-18)/v.scale,x1=v.cx+(w/2-18)/v.scale;
-    const y0=v.cy-(h/2-30)/v.scale,y1=v.cy+(h/2-20)/v.scale;
+    const y0=v.cy-(h/2-30)/v.scale,y1=v.cy+(h/2-plotTop-20)/v.scale;
     const step=niceStep(Math.max(x1-x0,y1-y0),Math.max(3,Math.floor(w/60)));
     if(display.showAxes) {
       for(let i=Math.ceil(x0/step);i<=Math.floor(x1/step);i++) {
         const x=i*step,px=screen([x,0],v)[0];
-        line(ctx,[[px,18],[px,h-30]],C.grid,1);
-        if(i!==0) text(ctx,tickText(x),px,clamp(origin[1]+15,31,h-17),C.muted,'center');
+        line(ctx,[[px,plotTop+18],[px,h-30]],C.grid,1);
+        if(i!==0) text(ctx,tickText(x),px,clamp(origin[1]+15,plotTop+31,h-17),C.muted,'center');
       }
       for(let i=Math.ceil(y0/step);i<=Math.floor(y1/step);i++) {
         const y=i*step,py=screen([0,y],v)[1];
@@ -570,14 +653,14 @@
       }
     }
     const color=v.kind==='bob'?C.bob:C.alice;
-    const ox=clamp(origin[0],20,w-23),oy=clamp(origin[1],21,h-31);
+    const ox=clamp(origin[0],20,w-23),oy=clamp(origin[1],plotTop+21,h-31);
     const prime=v.kind==='bob'?'′':'';
     line(ctx,[[18,oy],[w-17,oy]],color,1.1);
-    line(ctx,[[ox,h-28],[ox,16]],color,1.1);
+    line(ctx,[[ox,h-28],[ox,plotTop+16]],color,1.1);
     line(ctx,[[w-23,oy-3],[w-17,oy],[w-23,oy+3]],color,1.1);
-    line(ctx,[[ox-3,22],[ox,16],[ox+3,22]],color,1.1);
-    text(ctx,'x'+prime,w-15,clamp(oy-13,14,h-18),color,'right','italic 13px Georgia, serif');
-    text(ctx,'y'+prime,ox+10,18,color,'left','italic 13px Georgia, serif');
+    line(ctx,[[ox-3,plotTop+22],[ox,plotTop+16],[ox+3,plotTop+22]],color,1.1);
+    text(ctx,'x'+prime,w-15,clamp(oy-13,plotTop+14,h-18),color,'right','italic 13px Georgia, serif');
+    text(ctx,'y'+prime,ox+10,plotTop+18,color,'left','italic 13px Georgia, serif');
     text(ctx,tr('gridSpacing')+': '+tickText(step)+' m',16,h-10);
     return {origin,step};
   }
@@ -599,7 +682,7 @@
     const pick=v.kind==='bob'?p=>p.bob.r:p=>p.alice.r;
     const color=v.kind==='bob'?C.bob:C.alice;
     ctx.save();
-    const pad=12;ctx.beginPath();ctx.rect(pad,pad,v.w-2*pad,v.h-35);ctx.clip();
+    const pad=12;ctx.beginPath();ctx.rect(pad,v.plotTop+pad,v.w-2*pad,v.h-v.plotTop-35);ctx.clip();
     ctx.globalAlpha=0.28;pathPart(ctx,future,pick,v,color,[4,5],1.6);
     ctx.globalAlpha=0.85;historyPart(ctx,history[v.kind==='bob'?'bob':'alice'].path,v,color,2);
     if(params.aliceMode==='circle'&&v.kind!=='bob') {
@@ -637,21 +720,35 @@
     const u=d===0?0:clamp(((p[0]-a[0])*dx+(p[1]-a[1])*dy)/d,0,1);
     return Math.hypot(p[0]-a[0]-u*dx,p[1]-a[1]-u*dy);
   }
+  function labelSize(ctx,name,font='600 13px system-ui, sans-serif') {
+    const parts=/^a_([^ =]+)(.*)$/.exec(name);
+    let width;
+    if(parts) {
+      ctx.font='italic 16px Georgia, serif';width=ctx.measureText('a').width+1;
+      ctx.font='11px system-ui, sans-serif';width+=ctx.measureText(parts[1]).width;
+      ctx.font='13px system-ui, sans-serif';width+=ctx.measureText(parts[2]).width;
+    } else {ctx.font=font;width=ctx.measureText(name).width;}
+    return {w:width+8,h:parts?24:20,parts};
+  }
+  function labelInBox(ctx,item,box,size) {
+    const color=item.color||C.text,y=box.y+box.h/2;
+    if(size.parts) {
+      ctx.fillStyle=color;ctx.textAlign='left';ctx.textBaseline='alphabetic';
+      ctx.font='italic 16px Georgia, serif';ctx.fillText('a',box.x+4,y+3);
+      let x=box.x+4+ctx.measureText('a').width+1;
+      ctx.font='11px system-ui, sans-serif';ctx.fillText(size.parts[1],x,y+7);
+      x+=ctx.measureText(size.parts[1]).width;
+      ctx.font='13px system-ui, sans-serif';ctx.fillText(size.parts[2],x,y+3);
+    } else {
+      ctx.font=item.font||'600 13px system-ui, sans-serif';ctx.fillStyle=color;
+      ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(item.name,box.x+4,y);
+    }
+  }
   function drawLabels(ctx,labels,v,segments,obstacles) {
     const occupied=[...obstacles],metrics=[];
     for(const item of labels) {
       const font=item.font||'600 13px system-ui, sans-serif';
-      const parts=/^a_([^ =]+)(.*)$/.exec(item.name);
-      let contentWidth;
-      if(parts) {
-        ctx.font='italic 16px Georgia, serif';
-        contentWidth=ctx.measureText('a').width+1;
-        ctx.font='11px system-ui, sans-serif';
-        contentWidth+=ctx.measureText(parts[1]).width;
-        ctx.font='13px system-ui, sans-serif';
-        contentWidth+=ctx.measureText(parts[2]).width;
-      } else {ctx.font=font;contentWidth=ctx.measureText(item.name).width;}
-      const width=contentWidth+8,height=parts?24:20;
+      const size=labelSize(ctx,item.name,font),{w:width,h:height,parts}=size;
       const candidates=[[10,-20],[10,7],[-width-10,-20],[-width-10,7],[-width/2,-30],[-width/2,14],
         [18,-9],[-width-18,-9],[23,-31],[23,18],[-width-23,-31],[-width-23,18]];
       for(const radius of [44,65,90]) for(let i=0;i<8;i++) {
@@ -661,7 +758,7 @@
       let best=null,bestScore=Infinity;
       for(let i=0;i<candidates.length;i++) {
         const [dx,dy]=candidates[i];
-        const box={x:clamp(item.anchor[0]+dx,7,v.w-width-7),y:clamp(item.anchor[1]+dy,7,v.h-height-29),w:width,h:height};
+        const box={x:clamp(item.anchor[0]+dx,7,v.w-width-7),y:clamp(item.anchor[1]+dy,v.plotTop+7,v.h-height-29),w:width,h:height};
         const center=[box.x+width/2,box.y+height/2];
         let score=i*0.3;
         for(const other of occupied) score+=overlaps(box,other)*30;
@@ -675,15 +772,7 @@
       if(norm(sub(edge,item.anchor))>12) {
         ctx.save();ctx.globalAlpha=0.45;line(ctx,[item.anchor,edge],item.color||C.muted,0.8);ctx.restore();
       }
-      if(parts) {
-        const y=best.y+height/2;
-        ctx.fillStyle=item.color||C.text;ctx.textAlign='left';ctx.textBaseline='alphabetic';
-        ctx.font='italic 16px Georgia, serif';ctx.fillText('a',best.x+4,y+3);
-        let x=best.x+4+ctx.measureText('a').width+1;
-        ctx.font='11px system-ui, sans-serif';ctx.fillText(parts[1],x,y+7);
-        x+=ctx.measureText(parts[1]).width;
-        ctx.font='13px system-ui, sans-serif';ctx.fillText(parts[2],x,y+3);
-      } else text(ctx,item.name,best.x+4,best.y+height/2,item.color||C.text,'left',font);
+      labelInBox(ctx,item,best,size);
       occupied.push(best);metrics.push({...best,name:item.name,subscript:parts?parts[1]:null});
     }
     return metrics;
@@ -710,12 +799,13 @@
       line(ctx,[origin,add(origin,[radius+6,0])],C.axis,1,[2,3]);
       ctx.beginPath();ctx.arc(origin[0],origin[1],radius,0,-thetaWrapped,thetaWrapped>0);
       ctx.strokeStyle=C.bob;ctx.lineWidth=1.2;ctx.stroke();
-      labels.push({name:'θ',anchor:add(origin,[(radius+7)*Math.cos(thetaWrapped/2),-(radius+7)*Math.sin(thetaWrapped/2)]),color:C.bob,font:'italic 13px Georgia, serif'});
+      labels.push({name:'φ',anchor:add(origin,[(radius+7)*Math.cos(thetaWrapped/2),-(radius+7)*Math.sin(thetaWrapped/2)]),color:C.bob,font:'italic 13px Georgia, serif'});
     }
     dot(ctx,origin,C.bob,4);
   }
   function drawScene(kind,prepared,v,s,data,history) {
     const {ctx}=prepared;
+    ctx.save();ctx.beginPath();ctx.rect(0,v.plotTop,v.w,v.h-v.plotTop);ctx.clip();
     grid(ctx,v);paths(ctx,v,data,s,history);
     const labels=[],segments=[],obstacles=[],arrowMetrics=[];
     const body=kind==='frames'?s.alice:s[kind],particle=screen(body.r,v);
@@ -736,11 +826,6 @@
         const shift=mul(J(sub(b,a)),6/length),aa=add(a,shift),bb=add(b,shift);
         line(ctx,[a,aa],C.axis,0.8);line(ctx,[b,bb],C.axis,0.8);a=aa;b=bb;
       }
-      // Pri eni sami komponenti se črtkana vsota vzporedno odmakne za 5 px.
-      if(arrow.dash&&arrows.length===2&&length>0.2) {
-        const shift=mul(J(sub(b,a)),5/length),aa=add(a,shift),bb=add(b,shift);
-        line(ctx,[a,aa],C.axis,0.8);line(ctx,[b,bb],C.axis,0.8);a=aa;b=bb;
-      }
       arrowPixels(ctx,a,b,arrow.color,arrow.dash,VECTOR_STYLE.shaftWidth);
       segments.push([a,b]);
       // Ničelnih členov razcepa in ničelnega premika ne naštevamo na risbi.
@@ -749,15 +834,15 @@
         const anchor=(kind==='frames'||(kind==='bob'&&display.showComponents))?mul(add(a,b),0.5):b;
         labels.push({name,anchor,color:arrow.color});
       }
-      arrowMetrics.push({name:arrow.name,from:a,to:b,lengthPx:length,magnitude,factor:arrow.factor,dash:arrow.dash});
+      arrowMetrics.push({name:arrow.name,from:a,to:b,lengthPx:length,magnitude,factor:arrow.factor,
+        baseFactor:arrow.baseFactor,magnification:arrow.magnification,quantity:arrow.quantity,
+        color:arrow.color,dash:arrow.dash,shaftWidth:VECTOR_STYLE.shaftWidth,headWidth:VECTOR_STYLE.headWidth});
     }
     obstacles.push({x:particle[0]-9,y:particle[1]-9,w:18,h:18});
     if(kind==='frames') labels.push({name:tr('body'),anchor:particle,color:C.particle,font:'11px system-ui, sans-serif'});
-    else if(kind==='bob'&&display.showComponents&&norm(s.bob.a)<1e-10) {
-      labels.push({name:'a_'+tr('totalTerm')+' = 0',anchor:particle,color:C.a});
-    }
     const labelMetrics=drawLabels(ctx,labels,v,segments,obstacles);
-    return {...v,arrows:arrowMetrics,labels:labelMetrics,particle};
+    ctx.restore();
+    return {...v,arrows:arrowMetrics,labels:labelMetrics,particle,inset:null};
   }
   function readouts(s,force=false) {
     const now=performance.now();
@@ -770,9 +855,14 @@
   function render() {
     const s=stateAt(time),data=getData(),history=trajectoryHistory(s);
     const kinds=['alice','bob','frames'],prepared={},views={};
+    for(const kind of kinds)prepared[kind]=prepare($(kind+'Canvas'));
+    if(magnificationPending) {
+      magnification=configurationMagnification(prepared);magnificationPending=false;
+      syncMagnificationInputs();
+    }
     // Točen trenutni položaj varuje tudi pred odstopanjem pri redkem vzorčenju.
     const bounds=Object.fromEntries(kinds.map(k=>[k,{...data.bounds[k]}]));
-    collectBounds(bounds,s);
+    collectBounds(bounds,s,true);
     if(display.showPaths) {
       mergeBounds(bounds.alice,history.alice.bounds);
       mergeBounds(bounds.bob,history.bob.bounds);
@@ -780,7 +870,6 @@
       mergeBounds(bounds.frames,history.origin.bounds);
     }
     for(const kind of kinds) {
-      prepared[kind]=prepare($(kind+'Canvas'));
       views[kind]=makeView(bounds[kind],prepared[kind].w,prepared[kind].h,kind);
     }
     if(display.sameScale) {
@@ -789,6 +878,11 @@
     }
     lastViews={};
     for(const kind of kinds) lastViews[kind]=drawScene(kind,prepared[kind],views[kind],s,data,history);
+    for(const kind of ['alice','bob']) {
+      const visible=display.showVelocity||display.showAcceleration||(kind==='bob'&&display.showComponents);
+      const node=$(kind+'Magnification'),value=visible?tr('vectorScaleNote',{factor:factorText(magnification)}):'';
+      if(node.textContent!==value)node.textContent=value;
+    }
     readouts(s,!running);
   }
   function frame(timestamp) {
